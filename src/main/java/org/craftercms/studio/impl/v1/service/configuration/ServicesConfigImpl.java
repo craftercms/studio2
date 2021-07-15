@@ -21,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.craftercms.commons.validation.annotations.param.ValidateParams;
 import org.craftercms.commons.validation.annotations.param.ValidateStringParam;
 import org.craftercms.core.util.XmlUtils;
+import org.craftercms.studio.api.v1.exception.ServiceLayerException;
 import org.craftercms.studio.api.v1.repository.ContentRepository;
 import org.craftercms.studio.api.v1.service.GeneralLockService;
 import org.craftercms.studio.api.v1.service.configuration.ContentTypesConfig;
@@ -50,7 +51,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
@@ -123,7 +123,7 @@ public class ServicesConfigImpl implements ServicesConfig {
     protected GeneralLockService generalLockService;
     protected StudioConfiguration studioConfiguration;
     protected ConfigurationService configurationService;
-    protected Cache<String, Optional<SiteConfigTO>> configurationCache;
+    protected Cache<String, SiteConfigTO> configurationCache;
 
     protected SiteConfigTO getSiteConfig(final String site) {
         return loadConfiguration(site);
@@ -315,7 +315,7 @@ public class ServicesConfigImpl implements ServicesConfig {
          var cacheKey = configurationService.getCacheKey(site, MODULE_STUDIO, getConfigFileName(), environment, "object");
 
          try {
-             var config = configurationCache.get(cacheKey, () -> {
+             return configurationCache.get(cacheKey, () -> {
                  Document document =
                          configurationService.getConfigurationAsDocument(site, MODULE_STUDIO, configFilename, environment);
                  if (document != null) {
@@ -380,13 +380,12 @@ public class ServicesConfigImpl implements ServicesConfig {
                              getStringList(configNode.selectNodes(SITE_CONFIG_XML_ELEMENT_PROTECTED_FOLDER_PATTERNS));
                      siteConfig.setProtectedFolderPatterns(protectedFolderPatterns);
 
-                     return Optional.of(siteConfig);
+                     return siteConfig;
                  } else {
-                     return Optional.empty();
+                     throw new ServiceLayerException("No site configuration found for " + site + " at " +
+                             getConfigFileName());
                  }
              });
-
-             return config.orElse(null);
          } catch (ExecutionException e) {
              LOGGER.error("No site configuration found for " + site + " at " + getConfigFileName());
              return null;
@@ -758,7 +757,7 @@ public class ServicesConfigImpl implements ServicesConfig {
         this.configurationService = configurationService;
     }
 
-    public void setConfigurationCache(Cache<String, Optional<SiteConfigTO>> configurationCache) {
+    public void setConfigurationCache(Cache<String, SiteConfigTO> configurationCache) {
         this.configurationCache = configurationCache;
     }
 

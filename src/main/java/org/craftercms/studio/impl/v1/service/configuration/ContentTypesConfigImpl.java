@@ -21,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.craftercms.commons.validation.annotations.param.ValidateParams;
 import org.craftercms.commons.validation.annotations.param.ValidateStringParam;
 import org.craftercms.studio.api.v1.constant.StudioConstants;
+import org.craftercms.studio.api.v1.exception.ServiceLayerException;
 import org.craftercms.studio.api.v1.log.Logger;
 import org.craftercms.studio.api.v1.log.LoggerFactory;
 import org.craftercms.studio.api.v1.service.GeneralLockService;
@@ -41,7 +42,6 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
@@ -66,7 +66,7 @@ public class ContentTypesConfigImpl implements ContentTypesConfig {
     protected StudioConfiguration studioConfiguration;
     protected ConfigurationService configurationService;
 
-    protected Cache<String, Optional<ContentTypeConfigTO>> cache;
+    protected Cache<String, ContentTypeConfigTO> cache;
 
     @Override
     @ValidateParams
@@ -89,7 +89,7 @@ public class ContentTypesConfigImpl implements ContentTypesConfig {
 
         var cacheKey = configurationService.getCacheKey(site, null, configFileFullPath, null, "object");
         try {
-            var object = cache.get(cacheKey, () -> {
+            return cache.get(cacheKey, () -> {
                 logger.debug("Cache miss: {0}", cacheKey);
 
                 if (contentService.contentExists(site, configFileFullPath)) {
@@ -128,13 +128,13 @@ public class ContentTypesConfigImpl implements ContentTypesConfig {
                     contentTypeConfig.setQuickCreate(quickCreate);
                     contentTypeConfig.setQuickCreatePath(root.valueOf(QUICK_CREATE_PATH));
 
-                    return Optional.of(contentTypeConfig);
+                    return contentTypeConfig;
                 } else {
                     logger.debug("No content type configuration document found at " + configFileFullPath);
-                    return Optional.empty();
+                    throw new ServiceLayerException("No content type configuration document found at "
+                            + configFileFullPath);
                 }
             });
-            return object.orElse(null);
         } catch (ExecutionException e) {
             logger.debug("No content type configuration document found at " + configFileFullPath);
             return null;
@@ -304,7 +304,7 @@ public class ContentTypesConfigImpl implements ContentTypesConfig {
         this.configurationService = configurationService;
     }
 
-    public void setCache(Cache<String, Optional<ContentTypeConfigTO>> cache) {
+    public void setCache(Cache<String, ContentTypeConfigTO> cache) {
         this.cache = cache;
     }
 

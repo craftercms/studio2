@@ -76,7 +76,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.ExecutionException;
@@ -127,7 +126,7 @@ public class SecurityServiceImpl implements SecurityService {
     protected AuditServiceInternal auditServiceInternal;
     protected SiteService siteService;
 
-    protected Cache<String, Optional<PermissionsConfigTO>> cache;
+    protected Cache<String, PermissionsConfigTO> cache;
 
     @Override
     public String getCurrentUser() {
@@ -329,11 +328,6 @@ public class SecurityServiceImpl implements SecurityService {
         return permissions;
     }
 
-    /* Derives a key based off the site and filename */
-    protected String getPermissionsKey(String site, String filename) {
-        return new StringBuffer(site).append(":").append(filename).toString();
-    }
-
     /**
      * add user roles
      *
@@ -500,7 +494,7 @@ public class SecurityServiceImpl implements SecurityService {
         var cacheKey = configurationService.getCacheKey(site, MODULE_STUDIO, filename, environment, "object");
 
         try {
-            var object = cache.get(cacheKey, () -> {
+            return cache.get(cacheKey, () -> {
                 Document document =
                         configurationService.getConfigurationAsDocument(site, MODULE_STUDIO, filename, environment);
                 if (document != null) {
@@ -517,14 +511,12 @@ public class SecurityServiceImpl implements SecurityService {
                     config.setKey(site + ":" + filename);
                     config.setLastUpdated(ZonedDateTime.now(ZoneOffset.UTC));
 
-                    return Optional.of(config);
+                    return config;
                 } else {
                     logger.error("Permission mapping not found for " + site + ":" + filename);
-                    return Optional.empty();
+                    throw new ServiceLayerException("Permission mapping not found for " + site + ":" + filename);
                 }
             });
-
-            return object.orElse(null);
         } catch (ExecutionException e) {
             logger.error("Permission mapping not found for " + site + ":" + filename);
             return null;
@@ -590,7 +582,7 @@ public class SecurityServiceImpl implements SecurityService {
         var cacheKey = configurationService.getCacheKey(null, null, globalPermissionsConfigPath, null, "object");
 
         try {
-            var permissions = cache.get(cacheKey, () -> {
+            return cache.get(cacheKey, () -> {
                 Document document = configurationService.getGlobalConfigurationAsDocument(globalPermissionsConfigPath);
                 if (document != null) {
                     PermissionsConfigTO config = new PermissionsConfigTO();
@@ -604,14 +596,13 @@ public class SecurityServiceImpl implements SecurityService {
                     config.setKey(globalPermissionsKey);
                     config.setLastUpdated(ZonedDateTime.now(ZoneOffset.UTC));
 
-                    return Optional.of(config);
+                    return config;
                 } else {
                     logger.error("Global permission mapping not found (path: {0})", globalPermissionsConfigPath);
-                    return Optional.empty();
+                    throw new ServiceLayerException("Global permission mapping not found (path: " +
+                            globalPermissionsConfigPath + ")");
                 }
             });
-
-            return permissions.orElse(null);
         } catch (ExecutionException e) {
             logger.error("Global permission mapping not found (path: {0})", globalPermissionsConfigPath);
             return null;
@@ -954,7 +945,7 @@ public class SecurityServiceImpl implements SecurityService {
         this.siteService = siteService;
     }
 
-    public void setCache(Cache<String, Optional<PermissionsConfigTO>> cache) {
+    public void setCache(Cache<String, PermissionsConfigTO> cache) {
         this.cache = cache;
     }
 
